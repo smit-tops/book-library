@@ -1,69 +1,99 @@
-import React, {
-  ChangeEvent,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
-import { getBookSercice } from "../services/getBooks";
-import BookList from "./BookList";
+import React, { ChangeEvent, useCallback, useEffect, useState } from "react";
+import { getBookService } from "../services/getBooks";
+import useDebounce from "../utils/debounce";
+import { objectToQueryString } from "../utils/objectToQuery";
+import { SearchForm } from "./SearchForm";
+import { SearchResults } from "./SearchResult";
 
-export default function SearchBook() {
-  const [searchValue, setSearchValue] = useState<string>("");
-  const [bookList, setBookList] = useState<IBookData[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [sortBy, setsortBy] = useState<string>("");
+interface FilterState {
+  page: number;
+  limit: number;
+  sort: string;
+  q: string;
+}
 
-  const timer = useRef<NodeJS.Timeout>();
+const initialFilters: FilterState = {
+  page: 1,
+  limit: 10,
+  sort: "",
+  q: "",
+};
+
+const SearchBook: React.FC = () => {
+  const [bookList, setBookList] = useState<IBookData[]>([]); // State for book list
+  const [loading, setLoading] = useState<boolean>(false); // State for loading indicator
+  const [filters, setFilters] = useState<FilterState>(initialFilters); // State for search filters
+  const [response, setResponse] = useState<BookApiResponse | null>(null); // State for API response
+  const { debounce } = useDebounce(); // Using debounce hook to delay API calls
+
+  const clearSearch = () => {
+    setResponse(null);
+    setBookList([]);
+    setLoading(false);
+  };
 
   const getBooks = useCallback(async () => {
-    setLoading(true);
-    const { status, data }: { status: boolean; data: BookApiResponse } =
-      await getBookSercice(searchValue, sortBy);
-    setLoading(false);
-    if (status && data.q === searchValue) setBookList(data.docs);
-  }, [searchValue, sortBy]);
+    if (!filters.q) {
+      clearSearch(); // Clear search if the query is empty
+      return;
+    }
 
-  useEffect(() => {
-    clearTimeout(timer.current);
-    timer.current = setTimeout(() => {
-      getBooks();
-    }, 1500);
-  }, [getBooks]);
+    setLoading(true); // Set loading indicator
+    try {
+      const { status, data }: { status: boolean; data: BookApiResponse } =
+        await getBookService(objectToQueryString(filters)); // Fetch books based on filters
+      if (status) {
+        setResponse(data); // Update response if successful
+      }
+    } catch (error) {
+      console.error("Error fetching books:", error); // Log error if fetching fails
+    } finally {
+      setLoading(false); // Set loading indicator back to false
+    }
+  }, [filters]);
 
   const handleInputChange = (event: ChangeEvent<HTMLInputElement>) => {
-    setSearchValue(event.target.value);
+    if (!event.target.value) {
+      clearSearch();
+    }
+    setFilters({ ...filters, q: event.target.value }); // Update query filter on input change
   };
 
-  const handleSort = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    setsortBy(event.target.value);
+  const handleSortChange = (event: ChangeEvent<HTMLSelectElement>) => {
+    setFilters({ ...filters, sort: event.target.value }); // Update sort filter on change
   };
+
+  const handlePageChange = (event: ChangeEvent<HTMLSelectElement>) => {
+    setFilters({ ...filters, page: parseInt(event.target.value) }); // Update page filter on change
+  };
+
+  useEffect(() => {
+    debounce(getBooks, 1500); // Apply debounce to getBooks function
+  }, [getBooks]);
+
+  useEffect(() => {
+    if (response?.q === filters.q) {
+      setBookList(response.docs); // Update book list if the query matches
+    }
+  }, [response]);
 
   return (
-    <div>
-      <input
-        placeholder="search for book title"
-        type="text"
-        value={searchValue}
-        onChange={handleInputChange}
-        className="form-control"
+    <div className="container">
+      <SearchForm
+        filters={filters}
+        onInputChange={handleInputChange}
+        onSortChange={handleSortChange}
+        onPageChange={handlePageChange}
       />
 
-      <div className="mt-2 d-flex justify-content-end">
-        <select className="form-control w-25 ml-auto" onChange={handleSort}>
-          <option value="">Relevance</option>
-          <option value="old">Publication Year (Oldest First)</option>
-          <option value="new">Publication Year (Newest First)</option>
-        </select>
-      </div>
-
-      <div className="my-4">
-        {loading ? (
-          <p>Searching the library shelves.....</p>
-        ) : (
-          <BookList bookList={bookList} />
-        )}
-      </div>
+      <SearchResults
+        loading={loading}
+        response={response}
+        filters={filters}
+        bookList={bookList}
+      />
     </div>
   );
-}
+};
+
+export default SearchBook;

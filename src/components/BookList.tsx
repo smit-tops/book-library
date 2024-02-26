@@ -7,30 +7,12 @@ export default function BookList({ bookList }: { bookList: IBookData[] }) {
   }
 
   return (
-    <div>
-      <div className="table-responsive">
-        <table className="table table-bordered table-striped">
-          <thead>
-            <tr>
-              <th>Book Title</th>
-              <th>Author(s) Name</th>
-              <th>Published Year</th>
-              <th>ISBN Number(s)</th>
-              <th>Number of Pages</th>
-            </tr>
-          </thead>
-          <tbody>
-            {bookList?.map((book: IBookData) => {
-              return <BookCard key={book.id} book={book} />;
-            })}
-          </tbody>
-        </table>
+    <div className="card-list-container">
+      <div className="row">
+        {bookList.map((book, index) => (
+          <BookCard key={book.id} book={book} />
+        ))}
       </div>
-      {/* <div className="row gap-2">
-        {bookList?.map((book: IBookData) => {
-          return <BookCard key={book.id} book={book} />;
-        })}
-      </div> */}
     </div>
   );
 }
