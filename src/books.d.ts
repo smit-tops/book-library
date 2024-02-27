@@ -16,3 +16,10 @@ interface IBookData {
   isbn: string[];
   number_of_pages_median: number;
 }
+
+interface FilterState {
+  page: number;
+  limit: number;
+  sort: string;
+  q: string;
+}
